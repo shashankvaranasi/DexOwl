@@ -1,11 +1,13 @@
 require('dotenv').config();
 
+const express = require('express');
 const { initBot } = require('./bot');
 const priceMonitor = require('./priceMonitor');
 
 // Validate environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const CHECK_INTERVAL_MS = parseInt(process.env.CHECK_INTERVAL_MS) || 60000;
+const PORT = process.env.PORT || 3000;
 
 if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === 'your_bot_token_here') {
     console.error('❌ Error: TELEGRAM_BOT_TOKEN is not set in .env file');
@@ -13,6 +15,30 @@ if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === 'your_bot_token_here') {
     console.error('You can get a token from @BotFather on Telegram.');
     process.exit(1);
 }
+
+// Setup Express server for health checks (keeps Render alive)
+const app = express();
+
+app.get('/', (req, res) => {
+    res.json({
+        status: 'ok',
+        service: 'Telegram Memecoin Bot',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+    });
+});
+
+app.listen(PORT, () => {
+    console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
 
 // Initialize bot
 console.log('🚀 Starting Memecoin Price Alert Bot...');
