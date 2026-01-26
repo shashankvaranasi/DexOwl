@@ -40,7 +40,7 @@ function stopMonitor() {
  * Checks prices for all tokens in the watchlist
  */
 async function checkPrices() {
-    const allEntries = watchlist.getAllWatchlist();
+    const allEntries = await watchlist.getAllWatchlist();
 
     if (allEntries.length === 0) {
         return;
@@ -91,7 +91,7 @@ async function checkPrices() {
                 await sendPriceAlert(entry, tokenData, percentChange);
 
                 // Update last alert price for recursive alerts
-                watchlist.updateLastAlertPrice(
+                await watchlist.updateLastAlertPrice(
                     entry.tokenAddress,
                     entry.chainId,
                     entry.chatId,

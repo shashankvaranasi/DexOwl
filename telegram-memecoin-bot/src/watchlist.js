@@ -1,7 +1,4 @@
-const fs = require('fs');
-const path = require('path');
-
-const WATCHLIST_PATH = path.join(__dirname, '..', 'data', 'watchlist.json');
+const { getDB } = require('./database');
 
 /**
  * Watchlist entry structure
@@ -18,32 +15,37 @@ const WATCHLIST_PATH = path.join(__dirname, '..', 'data', 'watchlist.json');
  */
 
 /**
- * Loads the watchlist from disk
- * @returns {WatchlistEntry[]} Array of watchlist entries
+ * Gets the watchlist collection
+ * @returns {import('mongodb').Collection}
  */
-function loadWatchlist() {
-    try {
-        if (fs.existsSync(WATCHLIST_PATH)) {
-            const data = fs.readFileSync(WATCHLIST_PATH, 'utf8');
-            return JSON.parse(data);
-        }
-    } catch (error) {
-        console.error('Error loading watchlist:', error.message);
-    }
-    return [];
+function getCollection() {
+    return getDB().collection('watchlist');
 }
 
 /**
- * Saves the watchlist to disk
+ * Loads all watchlist entries from database
+ * @returns {Promise<WatchlistEntry[]>} Array of watchlist entries
+ */
+async function loadWatchlist() {
+    try {
+        return await getCollection().find({}).toArray();
+    } catch (error) {
+        console.error('Error loading watchlist:', error.message);
+        return [];
+    }
+}
+
+/**
+ * Saves/replaces the entire watchlist (for bulk operations)
  * @param {WatchlistEntry[]} watchlist - The watchlist to save
  */
-function saveWatchlist(watchlist) {
+async function saveWatchlist(watchlist) {
     try {
-        const dir = path.dirname(WATCHLIST_PATH);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        const collection = getCollection();
+        await collection.deleteMany({});
+        if (watchlist.length > 0) {
+            await collection.insertMany(watchlist);
         }
-        fs.writeFileSync(WATCHLIST_PATH, JSON.stringify(watchlist, null, 2));
     } catch (error) {
         console.error('Error saving watchlist:', error.message);
     }
@@ -59,26 +61,15 @@ function saveWatchlist(watchlist) {
  * @param {number} params.currentPrice - Current token price
  * @param {number} params.dropThreshold - Percentage drop threshold (default: 5)
  * @param {string} params.chatId - Telegram chat ID
- * @returns {WatchlistEntry|null} The added entry or null if already exists
+ * @returns {Promise<WatchlistEntry|null>} The added entry or null if already exists
  */
-function addToWatchlist({ tokenAddress, chainId, name, symbol, currentPrice, dropThreshold = 5, chatId }) {
-    const watchlist = loadWatchlist();
-
-    // Check if already exists
+async function addToWatchlist({ tokenAddress, chainId, name, symbol, currentPrice, dropThreshold = 5, chatId }) {
     const normalizedAddress = tokenAddress.toLowerCase();
-    const exists = watchlist.some(
-        entry => entry.tokenAddress.toLowerCase() === normalizedAddress &&
-            entry.chainId.toLowerCase() === chainId.toLowerCase() &&
-            entry.chatId === chatId
-    );
-
-    if (exists) {
-        return null;
-    }
+    const normalizedChainId = chainId.toLowerCase();
 
     const entry = {
         tokenAddress: normalizedAddress,
-        chainId: chainId.toLowerCase(),
+        chainId: normalizedChainId,
         name,
         symbol,
         dropThreshold,
@@ -88,10 +79,17 @@ function addToWatchlist({ tokenAddress, chainId, name, symbol, currentPrice, dro
         chatId
     };
 
-    watchlist.push(entry);
-    saveWatchlist(watchlist);
-
-    return entry;
+    try {
+        await getCollection().insertOne(entry);
+        return entry;
+    } catch (error) {
+        // Duplicate key error (already exists)
+        if (error.code === 11000) {
+            return null;
+        }
+        console.error('Error adding to watchlist:', error.message);
+        return null;
+    }
 }
 
 /**
@@ -99,42 +97,44 @@ function addToWatchlist({ tokenAddress, chainId, name, symbol, currentPrice, dro
  * @param {string} tokenAddress - Token contract address
  * @param {string} chainId - Blockchain chain ID
  * @param {string} chatId - Telegram chat ID
- * @returns {boolean} True if removed, false if not found
+ * @returns {Promise<boolean>} True if removed, false if not found
  */
-function removeFromWatchlist(tokenAddress, chainId, chatId) {
-    const watchlist = loadWatchlist();
+async function removeFromWatchlist(tokenAddress, chainId, chatId) {
     const normalizedAddress = tokenAddress.toLowerCase();
+    const normalizedChainId = chainId.toLowerCase();
 
-    const initialLength = watchlist.length;
-    const filtered = watchlist.filter(
-        entry => !(entry.tokenAddress.toLowerCase() === normalizedAddress &&
-            entry.chainId.toLowerCase() === chainId.toLowerCase() &&
-            entry.chatId === chatId)
-    );
-
-    if (filtered.length < initialLength) {
-        saveWatchlist(filtered);
-        return true;
+    try {
+        const result = await getCollection().deleteOne({
+            tokenAddress: normalizedAddress,
+            chainId: normalizedChainId,
+            chatId
+        });
+        return result.deletedCount > 0;
+    } catch (error) {
+        console.error('Error removing from watchlist:', error.message);
+        return false;
     }
-
-    return false;
 }
 
 /**
  * Gets all watchlist entries for a specific chat
  * @param {string} chatId - Telegram chat ID
- * @returns {WatchlistEntry[]} Array of watchlist entries for the chat
+ * @returns {Promise<WatchlistEntry[]>} Array of watchlist entries for the chat
  */
-function getWatchlistForChat(chatId) {
-    const watchlist = loadWatchlist();
-    return watchlist.filter(entry => entry.chatId === chatId);
+async function getWatchlistForChat(chatId) {
+    try {
+        return await getCollection().find({ chatId }).toArray();
+    } catch (error) {
+        console.error('Error getting watchlist for chat:', error.message);
+        return [];
+    }
 }
 
 /**
  * Gets all watchlist entries (for monitoring)
- * @returns {WatchlistEntry[]} All watchlist entries
+ * @returns {Promise<WatchlistEntry[]>} All watchlist entries
  */
-function getAllWatchlist() {
+async function getAllWatchlist() {
     return loadWatchlist();
 }
 
@@ -145,19 +145,21 @@ function getAllWatchlist() {
  * @param {string} chatId - Telegram chat ID
  * @param {number} newPrice - New last alert price
  */
-function updateLastAlertPrice(tokenAddress, chainId, chatId, newPrice) {
-    const watchlist = loadWatchlist();
+async function updateLastAlertPrice(tokenAddress, chainId, chatId, newPrice) {
     const normalizedAddress = tokenAddress.toLowerCase();
+    const normalizedChainId = chainId.toLowerCase();
 
-    const entry = watchlist.find(
-        e => e.tokenAddress.toLowerCase() === normalizedAddress &&
-            e.chainId.toLowerCase() === chainId.toLowerCase() &&
-            e.chatId === chatId
-    );
-
-    if (entry) {
-        entry.lastAlertPrice = newPrice;
-        saveWatchlist(watchlist);
+    try {
+        await getCollection().updateOne(
+            {
+                tokenAddress: normalizedAddress,
+                chainId: normalizedChainId,
+                chatId
+            },
+            { $set: { lastAlertPrice: newPrice } }
+        );
+    } catch (error) {
+        console.error('Error updating last alert price:', error.message);
     }
 }
 
@@ -167,25 +169,26 @@ function updateLastAlertPrice(tokenAddress, chainId, chatId, newPrice) {
  * @param {string} chainId - Blockchain chain ID
  * @param {string} chatId - Telegram chat ID
  * @param {number} newThreshold - New percentage threshold
- * @returns {boolean} True if updated, false if not found
+ * @returns {Promise<boolean>} True if updated, false if not found
  */
-function updateThreshold(tokenAddress, chainId, chatId, newThreshold) {
-    const watchlist = loadWatchlist();
+async function updateThreshold(tokenAddress, chainId, chatId, newThreshold) {
     const normalizedAddress = tokenAddress.toLowerCase();
+    const normalizedChainId = chainId.toLowerCase();
 
-    const entry = watchlist.find(
-        e => e.tokenAddress.toLowerCase() === normalizedAddress &&
-            e.chainId.toLowerCase() === chainId.toLowerCase() &&
-            e.chatId === chatId
-    );
-
-    if (entry) {
-        entry.dropThreshold = newThreshold;
-        saveWatchlist(watchlist);
-        return true;
+    try {
+        const result = await getCollection().updateOne(
+            {
+                tokenAddress: normalizedAddress,
+                chainId: normalizedChainId,
+                chatId
+            },
+            { $set: { dropThreshold: newThreshold } }
+        );
+        return result.matchedCount > 0;
+    } catch (error) {
+        console.error('Error updating threshold:', error.message);
+        return false;
     }
-
-    return false;
 }
 
 module.exports = {

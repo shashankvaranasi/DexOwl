@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
+const { connectDB, disconnectDB } = require('./database');
 const { initBot } = require('./bot');
 const priceMonitor = require('./priceMonitor');
 
@@ -36,37 +37,49 @@ app.get('/health', (req, res) => {
     });
 });
 
-app.listen(PORT, () => {
-    console.log(`🌐 HTTP server listening on port ${PORT}`);
-});
+let bot = null;
 
-// Initialize bot
-console.log('🚀 Starting Memecoin Price Alert Bot...');
+// Main startup function
+async function main() {
+    try {
+        // Connect to MongoDB first
+        await connectDB();
 
-const bot = initBot(TELEGRAM_BOT_TOKEN);
+        // Start Express server
+        app.listen(PORT, () => {
+            console.log(`🌐 HTTP server listening on port ${PORT}`);
+        });
 
-// Start price monitoring
-priceMonitor.startMonitor(bot, CHECK_INTERVAL_MS);
+        // Initialize bot
+        console.log('🚀 Starting Memecoin Price Alert Bot...');
+        bot = initBot(TELEGRAM_BOT_TOKEN);
 
-console.log('✅ Bot is running!');
-console.log(`📊 Checking prices every ${CHECK_INTERVAL_MS / 1000} seconds`);
-console.log('');
-console.log('Press Ctrl+C to stop the bot.');
+        // Start price monitoring
+        priceMonitor.startMonitor(bot, CHECK_INTERVAL_MS);
+
+        console.log('✅ Bot is running!');
+        console.log(`📊 Checking prices every ${CHECK_INTERVAL_MS / 1000} seconds`);
+        console.log('');
+        console.log('Press Ctrl+C to stop the bot.');
+    } catch (error) {
+        console.error('❌ Failed to start:', error.message);
+        process.exit(1);
+    }
+}
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
+async function shutdown() {
     console.log('\n🛑 Shutting down...');
     priceMonitor.stopMonitor();
-    bot.stopPolling();
+    if (bot) {
+        bot.stopPolling();
+    }
+    await disconnectDB();
     process.exit(0);
-});
+}
 
-process.on('SIGTERM', () => {
-    console.log('\n🛑 Shutting down...');
-    priceMonitor.stopMonitor();
-    bot.stopPolling();
-    process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
@@ -76,3 +89,7 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
+
+// Start the application
+main();
+

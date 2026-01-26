@@ -157,7 +157,7 @@ async function handleAdd(msg, match) {
         return;
     }
 
-    const entry = watchlistManager.addToWatchlist({
+    const entry = await watchlistManager.addToWatchlist({
         tokenAddress,
         chainId,
         name: tokenData.name,
@@ -212,7 +212,7 @@ async function handleRemove(msg, match) {
     }
 
     const tokenAddress = args[1];
-    const removed = watchlistManager.removeFromWatchlist(tokenAddress, chainId, String(chatId));
+    const removed = await watchlistManager.removeFromWatchlist(tokenAddress, chainId, String(chatId));
 
     if (removed) {
         await bot.sendMessage(chatId, '✅ Token removed from your watchlist.');
@@ -226,7 +226,7 @@ async function handleRemove(msg, match) {
  */
 async function handleList(msg) {
     const chatId = msg.chat.id;
-    const entries = watchlistManager.getWatchlistForChat(String(chatId));
+    const entries = await watchlistManager.getWatchlistForChat(String(chatId));
 
     if (entries.length === 0) {
         await bot.sendMessage(chatId, '📋 Your watchlist is empty.\n\nUse `/add <chain> <address>` to add tokens.', { parse_mode: 'Markdown' });
@@ -381,7 +381,7 @@ async function handleThreshold(msg, match) {
         return;
     }
 
-    const updated = watchlistManager.updateThreshold(tokenAddress, chainId, String(chatId), newThreshold);
+    const updated = await watchlistManager.updateThreshold(tokenAddress, chainId, String(chatId), newThreshold);
 
     if (updated) {
         await bot.sendMessage(chatId, `✅ Alert threshold updated to ${newThreshold}%`);
