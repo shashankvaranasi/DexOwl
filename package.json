@@ -1,5 +1,5 @@
 {
-  "name": "telegram-memecoin-bot",
+  "name": "DexOwl",
   "version": "1.0.0",
   "description": "Telegram bot for memecoin price alerts using DexScreener API",
   "main": "src/index.js",
