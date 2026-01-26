@@ -164,7 +164,8 @@ ${changeEmoji} *${changeText}:* ${percentChange > 0 ? '+' : ''}${percentChange.t
  */
 function escapeMarkdown(text) {
     if (typeof text !== 'string') return String(text);
-    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    // For legacy Markdown mode, only escape: _ * ` [
+    return text.replace(/[_*`\[]/g, '\\$&');
 }
 
 module.exports = {
