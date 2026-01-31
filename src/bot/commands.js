@@ -1,57 +1,20 @@
-const TelegramBot = require('node-telegram-bot-api');
-const dexscreener = require('./dexscreener');
-const watchlistManager = require('./watchlist');
-const priceMonitor = require('./priceMonitor');
+/**
+ * Direct command handlers (commands with inline arguments)
+ * e.g., /add sol TokenAddress 5
+ */
+
+const dexscreener = require('../dexscreener');
+const watchlistManager = require('../watchlist');
+const { CHAIN_ALIASES } = require('./constants');
+const { escapeMarkdown } = require('./utils');
 
 let bot = null;
 
 /**
- * Supported chain aliases
+ * Sets the bot instance
  */
-const CHAIN_ALIASES = {
-    'sol': 'solana',
-    'eth': 'ethereum',
-    'bsc': 'bsc',
-    'bnb': 'bsc',
-    'arb': 'arbitrum',
-    'arbitrum': 'arbitrum',
-    'polygon': 'polygon',
-    'matic': 'polygon',
-    'avax': 'avalanche',
-    'avalanche': 'avalanche',
-    'base': 'base',
-    'solana': 'solana',
-    'ethereum': 'ethereum',
-    'sui': 'sui',
-    'ton': 'ton',
-    'tron': 'tron'
-};
-
-/**
- * Initializes the Telegram bot
- * @param {string} token - Telegram bot token
- * @returns {TelegramBot} The bot instance
- */
-function initBot(token) {
-    bot = new TelegramBot(token, { polling: true });
-
-    // Register command handlers
-    bot.onText(/\/start/, handleStart);
-    bot.onText(/\/help/, handleHelp);
-    bot.onText(/\/add (.+)/, handleAdd);
-    bot.onText(/\/remove (.+)/, handleRemove);
-    bot.onText(/\/list/, handleList);
-    bot.onText(/\/price (.+)/, handlePrice);
-    bot.onText(/\/search (.+)/, handleSearch);
-    bot.onText(/\/threshold (.+)/, handleThreshold);
-
-    // Handle errors
-    bot.on('polling_error', (error) => {
-        console.error('Polling error:', error.message);
-    });
-
-    console.log('🤖 Telegram bot initialized');
-    return bot;
+function setBot(botInstance) {
+    bot = botInstance;
 }
 
 /**
@@ -121,9 +84,9 @@ Use \`/search <token name>\` to find addresses
 }
 
 /**
- * Handles /add command
+ * Handles /add command with arguments
  */
-async function handleAdd(msg, match) {
+async function handleAddDirect(msg, match) {
     const chatId = msg.chat.id;
     const args = match[1].trim().split(/\s+/);
 
@@ -192,9 +155,9 @@ You'll be notified when price drops by ${threshold}% or more.
 }
 
 /**
- * Handles /remove command
+ * Handles /remove command with arguments
  */
-async function handleRemove(msg, match) {
+async function handleRemoveDirect(msg, match) {
     const chatId = msg.chat.id;
     const args = match[1].trim().split(/\s+/);
 
@@ -261,9 +224,9 @@ async function handleList(msg) {
 }
 
 /**
- * Handles /price command
+ * Handles /price command with arguments
  */
-async function handlePrice(msg, match) {
+async function handlePriceDirect(msg, match) {
     const chatId = msg.chat.id;
     const args = match[1].trim().split(/\s+/);
 
@@ -316,9 +279,9 @@ async function handlePrice(msg, match) {
 }
 
 /**
- * Handles /search command
+ * Handles /search command with arguments
  */
-async function handleSearch(msg, match) {
+async function handleSearchDirect(msg, match) {
     const chatId = msg.chat.id;
     const query = match[1].trim();
 
@@ -354,9 +317,9 @@ async function handleSearch(msg, match) {
 }
 
 /**
- * Handles /threshold command
+ * Handles /threshold command with arguments
  */
-async function handleThreshold(msg, match) {
+async function handleThresholdDirect(msg, match) {
     const chatId = msg.chat.id;
     const args = match[1].trim().split(/\s+/);
 
@@ -390,23 +353,14 @@ async function handleThreshold(msg, match) {
     }
 }
 
-/**
- * Escapes special markdown characters
- */
-function escapeMarkdown(text) {
-    if (typeof text !== 'string') return String(text);
-    // For legacy Markdown mode, only escape: _ * ` [
-    return text.replace(/[_*`\[]/g, '\\$&');
-}
-
-/**
- * Gets the bot instance
- */
-function getBot() {
-    return bot;
-}
-
 module.exports = {
-    initBot,
-    getBot
+    setBot,
+    handleStart,
+    handleHelp,
+    handleAddDirect,
+    handleRemoveDirect,
+    handleList,
+    handlePriceDirect,
+    handleSearchDirect,
+    handleThresholdDirect
 };
