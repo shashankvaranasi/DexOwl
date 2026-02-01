@@ -142,7 +142,7 @@ ${changeEmoji} *${changeText}:* ${percentChange > 0 ? '+' : ''}${percentChange.t
 ⚡ *Alert Threshold:* ${entry.dropThreshold}%
 
 🔗 *Chain:* ${escapeMarkdown(entry.chainId)}
-📝 *Address:* \`${entry.tokenAddress.slice(0, 8)}...${entry.tokenAddress.slice(-6)}\`
+📝 *Address:* \`${entry.tokenAddress}\`
 
 [View on DexScreener](${tokenData.url})
 `.trim();
