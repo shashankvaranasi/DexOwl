@@ -213,7 +213,8 @@ async function handleList(msg) {
             message += `*${escapeMarkdown(tokenData.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
             message += `💰 ${escapeMarkdown(priceFormatted)} | 📊 ${escapeMarkdown(marketCapFormatted)}\n`;
             message += `${changeEmoji} ${changeFromAlert}% from last alert | ${changeFromInitial}% total\n`;
-            message += `⚡ Threshold: ${entry.dropThreshold}%\n\n`;
+            message += `⚡ Threshold: ${entry.dropThreshold}%\n`;
+            message += `📝 \`${entry.tokenAddress}\`\n\n`;
         } else {
             message += `*${escapeMarkdown(entry.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
             message += `⚠️ Unable to fetch data\n\n`;
