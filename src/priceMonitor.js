@@ -1,4 +1,5 @@
 const dexscreener = require('./dexscreener');
+const geckoterminal = require('./geckoterminal');
 const watchlist = require('./watchlist');
 
 let monitorInterval = null;
@@ -60,7 +61,21 @@ async function checkPrices() {
     // Process each chain
     for (const [chainId, entries] of entriesByChain) {
         const addresses = entries.map(e => e.tokenAddress);
-        const tokenDataMap = await dexscreener.getMultipleTokensData(chainId, addresses);
+        let tokenDataMap = await dexscreener.getMultipleTokensData(chainId, addresses);
+
+        // Fallback to GeckoTerminal for missing tokens or DexScreener outage
+        const missingAddresses = addresses.filter(addr => !tokenDataMap.has(addr.toLowerCase()));
+        if (missingAddresses.length > 0) {
+            console.log(`⚠️ DexScreener missing data for ${missingAddresses.length} token(s). Falling back to GeckoTerminal...`);
+            try {
+                const fallbackDataMap = await geckoterminal.getMultipleTokensData(chainId, missingAddresses);
+                for (const [addr, data] of fallbackDataMap.entries()) {
+                    tokenDataMap.set(addr, data);
+                }
+            } catch (error) {
+                console.error('Fallback to GeckoTerminal failed:', error.message);
+            }
+        }
 
         for (const entry of entries) {
             const tokenData = tokenDataMap.get(entry.tokenAddress.toLowerCase());
