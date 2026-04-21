@@ -42,7 +42,9 @@ async function getTokenData(chainId, tokenAddress) {
 
         return null;
     } catch (error) {
-        console.error(`Error fetching token data for ${chainId}/${tokenAddress}:`, error.message);
+        if (!error.response || error.response.status !== 429) {
+            console.error(`Error fetching token data for ${chainId}/${tokenAddress}:`, error.message);
+        }
         return null;
     }
 }
@@ -108,7 +110,9 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
                 }
             }
         } catch (error) {
-            console.error(`Error fetching batch token data:`, error.message);
+            if (!error.response || error.response.status !== 429) {
+                console.error(`Error fetching batch token data:`, error.message);
+            }
         }
 
         // Small delay between batches to respect rate limits

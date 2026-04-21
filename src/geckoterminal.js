@@ -3,17 +3,26 @@ const axios = require('axios');
 const BASE_URL = 'https://api.geckoterminal.com/api/v2';
 const RATE_LIMIT_DELAY_MS = 2000; // gecko terminal free limit is 30 calls / min. 1 call per 2 seconds is safe.
 let lastCallTime = 0;
+let throttleQueue = Promise.resolve();
 
 /**
- * Throttle requests to respect the rate limit
+ * Throttle requests to respect the rate limit of 30 calls/min (1 every 2s)
+ * Uses a promise queue to properly serialize concurrent requests
  */
 async function throttle() {
-    const now = Date.now();
-    const timeSinceLastCall = now - lastCallTime;
-    if (timeSinceLastCall < RATE_LIMIT_DELAY_MS) {
-        await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_DELAY_MS - timeSinceLastCall));
-    }
-    lastCallTime = Date.now();
+    return new Promise(resolve => {
+        throttleQueue = throttleQueue.then(async () => {
+            const now = Date.now();
+            const timeSinceLastCall = now - lastCallTime;
+            
+            if (timeSinceLastCall < RATE_LIMIT_DELAY_MS) {
+                await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastCall));
+            }
+            
+            lastCallTime = Date.now();
+            resolve();
+        }).catch(() => resolve()); // Ensure queue never gets stuck
+    });
 }
 
 /**
