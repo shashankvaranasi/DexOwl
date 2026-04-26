@@ -42,9 +42,14 @@ async function getTokenData(chainId, tokenAddress) {
 
         return null;
     } catch (error) {
-        if (!error.response || error.response.status !== 429) {
-            console.error(`Error fetching token data for ${chainId}/${tokenAddress}:`, error.message);
-        }
+        const status = error.response?.status;
+        const data = error.response?.data;
+        console.error(`[DexScreener] Error fetching token data for ${chainId}/${tokenAddress}:`, {
+            message: error.message,
+            status,
+            data,
+            url: `${BASE_URL}/tokens/v1/${chainId}/${tokenAddress}`
+        });
         return null;
     }
 }
@@ -110,9 +115,14 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
                 }
             }
         } catch (error) {
-            if (!error.response || error.response.status !== 429) {
-                console.error(`Error fetching batch token data:`, error.message);
-            }
+            const status = error.response?.status;
+            const data = error.response?.data;
+            console.error(`[DexScreener] Error fetching batch token data for ${chainId}:`, {
+                message: error.message,
+                status,
+                data,
+                url: `${BASE_URL}/tokens/v1/${chainId}/${addressList}`
+            });
         }
 
         // Small delay between batches to respect rate limits
@@ -153,7 +163,14 @@ async function searchTokens(query) {
 
         return [];
     } catch (error) {
-        console.error(`Error searching tokens:`, error.message);
+        const status = error.response?.status;
+        const data = error.response?.data;
+        console.error(`[DexScreener] Error searching tokens for "${query}":`, {
+            message: error.message,
+            status,
+            data,
+            url: `${BASE_URL}/latest/dex/search?q=${encodeURIComponent(query)}`
+        });
         return [];
     }
 }
