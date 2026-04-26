@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const BASE_URL = 'https://api.geckoterminal.com/api/v2';
 const RATE_LIMIT_DELAY_MS = 2000; // gecko terminal free limit is 30 calls / min. 1 call per 2 seconds is safe.
@@ -54,12 +55,20 @@ async function getTokenData(chainId, tokenAddress) {
         const network = mapChainId(chainId);
         const url = `${BASE_URL}/networks/${network}/tokens/${tokenAddress}/pools?page=1`;
         
-        const response = await axios.get(url, {
+        const options = {
             timeout: 10000,
             headers: {
                 'Accept': 'application/json'
             }
-        });
+        };
+
+        // Add proxy agent if configured
+        if (process.env.PROXY_URL) {
+            options.httpsAgent = new HttpsProxyAgent(process.env.PROXY_URL);
+            options.proxy = false;
+        }
+
+        const response = await axios.get(url, options);
 
         if (response.data && response.data.data && response.data.data.length > 0) {
             const pools = response.data.data;
@@ -118,12 +127,20 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
         try {
             await throttle();
             const url = `${BASE_URL}/networks/${network}/tokens/multi/${addressList}`;
-            const response = await axios.get(url, {
+            const options = {
                 timeout: 10000,
                 headers: {
                     'Accept': 'application/json'
                 }
-            });
+            };
+
+            // Add proxy agent if configured
+            if (process.env.PROXY_URL) {
+                options.httpsAgent = new HttpsProxyAgent(process.env.PROXY_URL);
+                options.proxy = false;
+            }
+
+            const response = await axios.get(url, options);
 
             if (response.data && response.data.data) {
                 for (const token of response.data.data) {

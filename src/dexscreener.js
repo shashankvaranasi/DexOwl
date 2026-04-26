@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 const BASE_URL = 'https://api.dexscreener.com';
 
@@ -32,6 +33,14 @@ async function throttle() {
 async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
     try {
         await throttle();
+        
+        // Add proxy agent if configured
+        if (process.env.PROXY_URL) {
+            const agent = new HttpsProxyAgent(process.env.PROXY_URL);
+            options.httpsAgent = agent;
+            options.proxy = false; // Disable default axios proxy logic
+        }
+
         return await axios.get(url, options);
     } catch (error) {
         const status = error.response?.status;

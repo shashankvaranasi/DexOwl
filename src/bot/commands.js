@@ -198,26 +198,40 @@ async function handleList(msg) {
 
     await bot.sendMessage(chatId, '🔍 Fetching current prices...');
 
+    // Group by chain for batch fetching
+    const entriesByChain = new Map();
+    for (const entry of entries) {
+        if (!entriesByChain.has(entry.chainId)) {
+            entriesByChain.set(entry.chainId, []);
+        }
+        entriesByChain.get(entry.chainId).push(entry);
+    }
+
     let message = '📋 *Your Watchlist*\n\n';
 
-    for (const entry of entries) {
-        const tokenData = await dexscreener.getTokenData(entry.chainId, entry.tokenAddress);
+    for (const [chainId, chainEntries] of entriesByChain) {
+        const addresses = chainEntries.map(e => e.tokenAddress);
+        const tokenDataMap = await dexscreener.getMultipleTokensData(chainId, addresses);
 
-        if (tokenData) {
-            const priceFormatted = dexscreener.formatPrice(tokenData.priceUsd);
-            const marketCapFormatted = dexscreener.formatMarketCap(tokenData.marketCap);
-            const changeFromAlert = ((tokenData.priceUsd - entry.lastAlertPrice) / entry.lastAlertPrice * 100).toFixed(2);
-            const changeFromInitial = ((tokenData.priceUsd - entry.initialPrice) / entry.initialPrice * 100).toFixed(2);
-            const changeEmoji = parseFloat(changeFromAlert) >= 0 ? '📈' : '📉';
+        for (const entry of chainEntries) {
+            const tokenData = tokenDataMap.get(entry.tokenAddress.toLowerCase());
 
-            message += `*${escapeMarkdown(tokenData.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
-            message += `💰 ${escapeMarkdown(priceFormatted)} | 📊 ${escapeMarkdown(marketCapFormatted)}\n`;
-            message += `${changeEmoji} ${changeFromAlert}% from last alert | ${changeFromInitial}% total\n`;
-            message += `⚡ Threshold: ${entry.dropThreshold}%\n`;
-            message += `📝 \`${entry.tokenAddress}\`\n\n`;
-        } else {
-            message += `*${escapeMarkdown(entry.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
-            message += `⚠️ Unable to fetch data\n\n`;
+            if (tokenData) {
+                const priceFormatted = dexscreener.formatPrice(tokenData.priceUsd);
+                const marketCapFormatted = dexscreener.formatMarketCap(tokenData.marketCap);
+                const changeFromAlert = ((tokenData.priceUsd - entry.lastAlertPrice) / entry.lastAlertPrice * 100).toFixed(2);
+                const changeFromInitial = ((tokenData.priceUsd - entry.initialPrice) / entry.initialPrice * 100).toFixed(2);
+                const changeEmoji = parseFloat(changeFromAlert) >= 0 ? '📈' : '📉';
+
+                message += `*${escapeMarkdown(tokenData.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
+                message += `💰 ${escapeMarkdown(priceFormatted)} | 📊 ${escapeMarkdown(marketCapFormatted)}\n`;
+                message += `${changeEmoji} ${changeFromAlert}% from last alert | ${changeFromInitial}% total\n`;
+                message += `⚡ Threshold: ${entry.dropThreshold}%\n`;
+                message += `📝 \`${entry.tokenAddress}\`\n\n`;
+            } else {
+                message += `*${escapeMarkdown(entry.symbol)}* (${escapeMarkdown(entry.chainId)})\n`;
+                message += `⚠️ Unable to fetch data\n\n`;
+            }
         }
     }
 
