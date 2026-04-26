@@ -219,7 +219,8 @@ async function searchTokens(query) {
                 chainId: pair.chainId || '',
                 priceUsd: parseFloat(pair.priceUsd) || 0,
                 marketCap: pair.marketCap || pair.fdv || 0,
-                url: pair.url || ''
+                url: pair.url || '',
+                createdAt: pair.pairCreatedAt || 0
             }));
         }
 

@@ -5,7 +5,7 @@
 
 const dexscreener = require('../dexscreener');
 const watchlistManager = require('../watchlist');
-const { escapeMarkdown } = require('./utils');
+const { escapeMarkdown, formatAge } = require('./utils');
 
 let bot = null;
 
@@ -132,10 +132,11 @@ async function processSearch(chatId, query) {
     for (const token of results) {
         const priceFormatted = dexscreener.formatPrice(token.priceUsd);
         const marketCapFormatted = dexscreener.formatMarketCap(token.marketCap);
+        const age = formatAge(token.createdAt);
 
         message += `*${escapeMarkdown(token.name)}* ($${escapeMarkdown(token.symbol)})\n`;
         message += `💰 ${escapeMarkdown(priceFormatted)} | 📊 ${escapeMarkdown(marketCapFormatted)}\n`;
-        message += `🔗 ${escapeMarkdown(token.chainId)}\n`;
+        message += `⏳ Age: ${age} | 🔗 ${escapeMarkdown(token.chainId)}\n`;
         message += `📝 \`${token.address}\`\n\n`;
     }
 
