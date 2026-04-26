@@ -1,9 +1,11 @@
 require('dotenv').config();
 
 const express = require('express');
+const path = require('path');
 const { connectDB, disconnectDB } = require('./database');
 const { initBot } = require('./bot');
 const priceMonitor = require('./priceMonitor');
+const apiRouter = require('./api');
 
 // Validate environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -19,6 +21,29 @@ if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === 'your_bot_token_here') {
 
 // Setup Express server for health checks (keeps Render alive)
 const app = express();
+
+// CORS middleware for dashboard
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
+
+// Mount API router
+app.use('/api', apiRouter);
+
+// Serve dashboard static files
+const dashboardPath = path.join(__dirname, '../public/dashboard');
+app.use('/dashboard', express.static(dashboardPath));
+
+// Handle client-side routing for dashboard
+app.get('/dashboard/*', (req, res) => {
+    res.sendFile(path.join(dashboardPath, 'index.html'));
+});
 
 app.get('/', (req, res) => {
     res.json({

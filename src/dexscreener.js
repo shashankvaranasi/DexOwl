@@ -2,6 +2,57 @@ const axios = require('axios');
 
 const BASE_URL = 'https://api.dexscreener.com';
 
+// Rate limiting and throttling
+const RATE_LIMIT_DELAY_MS = 1000; // 1 request per second to be safe
+let lastCallTime = 0;
+let throttleQueue = Promise.resolve();
+
+/**
+ * Throttle requests to respect DexScreener rate limits
+ */
+async function throttle() {
+    return new Promise(resolve => {
+        throttleQueue = throttleQueue.then(async () => {
+            const now = Date.now();
+            const timeSinceLastCall = now - lastCallTime;
+            
+            if (timeSinceLastCall < RATE_LIMIT_DELAY_MS) {
+                await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastCall));
+            }
+            
+            lastCallTime = Date.now();
+            resolve();
+        }).catch(() => resolve());
+    });
+}
+
+/**
+ * Helper to fetch with retry and exponential backoff
+ */
+async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
+    try {
+        await throttle();
+        return await axios.get(url, options);
+    } catch (error) {
+        const status = error.response?.status;
+        const data = error.response?.data;
+        
+        // Handle 429 Rate Limit
+        if (status === 429 && retries > 0) {
+            // Check for retry-after in headers or response data (Cloudflare error 1015 provides it in data)
+            const retryAfterSec = parseInt(error.response.headers['retry-after']) || data?.retry_after || 0;
+            const waitTime = retryAfterSec > 0 ? (retryAfterSec * 1000) + 1000 : backoff;
+            
+            console.warn(`[DexScreener] ⚠️ Rate limited (429). Waiting ${waitTime/1000}s before retry... (${retries} retries left)`);
+            
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return fetchWithRetry(url, options, retries - 1, backoff * 2);
+        }
+        
+        throw error;
+    }
+}
+
 /**
  * Fetches token data from DexScreener API
  * @param {string} chainId - The blockchain chain ID (e.g., 'solana', 'ethereum', 'bsc')
@@ -11,7 +62,7 @@ const BASE_URL = 'https://api.dexscreener.com';
 async function getTokenData(chainId, tokenAddress) {
     try {
         const url = `${BASE_URL}/tokens/v1/${chainId}/${tokenAddress}`;
-        const response = await axios.get(url, {
+        const response = await fetchWithRetry(url, {
             timeout: 10000,
             headers: {
                 'Accept': 'application/json'
@@ -72,7 +123,7 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
         
         try {
             const url = `${BASE_URL}/tokens/v1/${chainId}/${addressList}`;
-            const response = await axios.get(url, {
+            const response = await fetchWithRetry(url, {
                 timeout: 10000,
                 headers: {
                     'Accept': 'application/json'
@@ -142,7 +193,7 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
 async function searchTokens(query) {
     try {
         const url = `${BASE_URL}/latest/dex/search?q=${encodeURIComponent(query)}`;
-        const response = await axios.get(url, {
+        const response = await fetchWithRetry(url, {
             timeout: 10000,
             headers: {
                 'Accept': 'application/json'
