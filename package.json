@@ -5,7 +5,9 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "build:dashboard": "cd dashboard && npm install && npm run build",
+    "build": "npm run build:dashboard"
   },
   "keywords": [
     "telegram",
@@ -21,6 +23,7 @@
     "dotenv": "^16.3.0",
     "express": "^4.18.2",
     "mongodb": "^6.3.0",
-    "node-telegram-bot-api": "^0.64.0"
+    "node-telegram-bot-api": "^0.64.0",
+    "https-proxy-agent": "^7.0.0"
   }
 }
