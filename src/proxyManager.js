@@ -22,16 +22,22 @@ class ProxyManager {
     _parseProxyLines(lines) {
         const parsed = [];
         for (const p of lines) {
-            const parts = p.split(':');
+            const cleanLine = p.trim();
+            if (!cleanLine) continue;
+
+            const parts = cleanLine.split(':');
             if (parts.length === 4) {
                 // Reformat IP:PORT:USER:PASS to http://USER:PASS@IP:PORT
-                const [ip, port, user, pass] = parts;
-                parsed.push(`http://${user}:${pass}@${ip}:${port}`);
-            } else if (p.startsWith('http')) {
-                parsed.push(p);
-            } else if (p.includes(':')) {
+                const [ip, port, user, pass] = parts.map(s => s.trim());
+                // Encode user/pass to handle special characters (@, :, etc.)
+                const encodedUser = encodeURIComponent(user);
+                const encodedPass = encodeURIComponent(pass);
+                parsed.push(`http://${encodedUser}:${encodedPass}@${ip}:${port}`);
+            } else if (cleanLine.startsWith('http')) {
+                parsed.push(cleanLine);
+            } else if (cleanLine.includes(':')) {
                 // Standard IP:PORT (no auth)
-                parsed.push(`http://${p}`);
+                parsed.push(`http://${cleanLine}`);
             }
         }
         return parsed;

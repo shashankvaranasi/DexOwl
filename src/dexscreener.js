@@ -133,7 +133,7 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
         const addressList = batch.join(',');
         
         try {
-            const url = `${BASE_URL}/tokens/v1/${chainId}/${addressList}`;
+            const url = `${BASE_URL}/tokens/v1/${chainId}/${addressList}`.trim();
             const response = await fetchWithRetry(url, {
                 timeout: 10000,
                 headers: {
