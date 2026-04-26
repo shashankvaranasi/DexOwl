@@ -84,10 +84,9 @@ async function main() {
         bot = initBot(TELEGRAM_BOT_TOKEN);
 
         // Start price monitoring
-        priceMonitor.startMonitor(bot, CHECK_INTERVAL_MS);
+        priceMonitor.startMonitor(bot);
 
         console.log('✅ Bot is running!');
-        console.log(`📊 Checking prices every ${CHECK_INTERVAL_MS / 1000} seconds`);
         console.log('');
         console.log('Press Ctrl+C to stop the bot.');
     } catch (error) {

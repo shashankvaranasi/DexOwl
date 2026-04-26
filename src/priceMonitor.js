@@ -8,22 +8,57 @@ let bot = null;
 /**
  * Initializes the price monitor
  * @param {Object} telegramBot - The Telegram bot instance
- * @param {number} intervalMs - Check interval in milliseconds
  */
-function startMonitor(telegramBot, intervalMs = 60000) {
+function startMonitor(telegramBot) {
     bot = telegramBot;
 
     if (monitorInterval) {
-        clearInterval(monitorInterval);
+        clearTimeout(monitorInterval);
     }
 
-    console.log(`📊 Price monitor started (checking every ${intervalMs / 1000}s)`);
+    console.log('📊 Price monitor started with Smart Intervals');
+    
+    // Start the recursive monitor loop
+    scheduleNextCheck();
+}
 
-    // Initial check after a short delay
-    setTimeout(() => checkPrices(), 5000);
+/**
+ * Calculates the current interval based on active hours
+ * @returns {number} Delay in milliseconds
+ */
+function getDynamicInterval() {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    const startHour = parseInt(process.env.ACTIVE_START_HOUR) || 9;
+    const endHour = parseInt(process.env.ACTIVE_END_HOUR) || 23;
+    const activeInterval = parseInt(process.env.ACTIVE_INTERVAL) || 60000;
+    const inactiveInterval = parseInt(process.env.INACTIVE_INTERVAL) || 900000;
 
-    // Regular interval checks
-    monitorInterval = setInterval(() => checkPrices(), intervalMs);
+    // Check if current hour is within active window
+    const isActive = currentHour >= startHour && currentHour < endHour;
+    
+    return isActive ? activeInterval : inactiveInterval;
+}
+
+/**
+ * Schedules the next check based on dynamic interval
+ */
+function scheduleNextCheck() {
+    const delay = getDynamicInterval();
+    const isHighSpeed = delay < 300000; // less than 5 mins is "high speed"
+    
+    console.log(`⏱️ Next check in ${delay / 1000 / 60} mins (${isHighSpeed ? 'Active Hours 🚀' : 'Inactive Hours 😴'})`);
+    
+    monitorInterval = setTimeout(async () => {
+        try {
+            await checkPrices();
+        } catch (error) {
+            console.error('Error during scheduled price check:', error.message);
+        } finally {
+            scheduleNextCheck(); // Always schedule the next one
+        }
+    }, delay);
 }
 
 /**
@@ -31,7 +66,7 @@ function startMonitor(telegramBot, intervalMs = 60000) {
  */
 function stopMonitor() {
     if (monitorInterval) {
-        clearInterval(monitorInterval);
+        clearTimeout(monitorInterval);
         monitorInterval = null;
         console.log('📊 Price monitor stopped');
     }
