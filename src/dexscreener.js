@@ -18,11 +18,11 @@ async function throttle() {
         throttleQueue = throttleQueue.then(async () => {
             const now = Date.now();
             const timeSinceLastCall = now - lastCallTime;
-            
+
             if (timeSinceLastCall < RATE_LIMIT_DELAY_MS) {
                 await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastCall));
             }
-            
+
             lastCallTime = Date.now();
             resolve();
         }).catch(() => resolve());
@@ -35,7 +35,7 @@ async function throttle() {
 async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
     try {
         await throttle();
-        
+
         // Add rotating proxy agent if enabled
         const agent = proxyManager.getNextAgent();
         if (agent) {
@@ -47,19 +47,27 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
     } catch (error) {
         const status = error.response?.status;
         const data = error.response?.data;
-        
+
         // Handle 429 Rate Limit
         if (status === 429 && retries > 0) {
             // Check for retry-after in headers or response data (Cloudflare error 1015 provides it in data)
             const retryAfterSec = parseInt(error.response.headers['retry-after']) || data?.retry_after || 0;
             const waitTime = retryAfterSec > 0 ? (retryAfterSec * 1000) + 1000 : backoff;
-            
-            console.warn(`[DexScreener] ⚠️ Rate limited (429). Waiting ${waitTime/1000}s before retry... (${retries} retries left)`);
-            
+
+            console.warn(`[DexScreener] ⚠️ Rate limited (429). Waiting ${waitTime / 1000}s before retry... (${retries} retries left)`);
+
             await new Promise(resolve => setTimeout(resolve, waitTime));
             return fetchWithRetry(url, options, retries - 1, backoff * 2);
         }
-        
+
+        // FALLBACK: If proxy fails (network error), retry WITHOUT proxy
+        if (!status && options.httpsAgent) {
+            console.warn(`[DexScreener] 🌐 Proxy failed (${error.message}), retrying WITHOUT proxy...`);
+            const optionsNoProxy = { ...options };
+            delete optionsNoProxy.httpsAgent;
+            return fetchWithRetry(url, optionsNoProxy, retries, backoff);
+        }
+
         throw error;
     }
 }
@@ -124,14 +132,14 @@ async function getTokenData(chainId, tokenAddress) {
  */
 async function getMultipleTokensData(chainId, tokenAddresses) {
     const results = new Map();
-    
+
     // DexScreener allows up to 30 addresses per request
     const batchSize = 30;
-    
+
     for (let i = 0; i < tokenAddresses.length; i += batchSize) {
         const batch = tokenAddresses.slice(i, i + batchSize);
         const addressList = batch.join(',');
-        
+
         try {
             const url = `${BASE_URL}/tokens/v1/${chainId}/${addressList}`.trim();
             const response = await fetchWithRetry(url, {
@@ -144,7 +152,7 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
             if (response.data && response.data.length > 0) {
                 // Group pairs by base token address
                 const pairsByToken = new Map();
-                
+
                 for (const pair of response.data) {
                     const addr = pair.baseToken?.address?.toLowerCase();
                     if (addr) {

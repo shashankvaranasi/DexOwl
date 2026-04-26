@@ -17,11 +17,11 @@ async function throttle() {
         throttleQueue = throttleQueue.then(async () => {
             const now = Date.now();
             const timeSinceLastCall = now - lastCallTime;
-            
+
             if (timeSinceLastCall < RATE_LIMIT_DELAY_MS) {
                 await new Promise(r => setTimeout(r, RATE_LIMIT_DELAY_MS - timeSinceLastCall));
             }
-            
+
             lastCallTime = Date.now();
             resolve();
         }).catch(() => resolve()); // Ensure queue never gets stuck
@@ -29,8 +29,43 @@ async function throttle() {
 }
 
 /**
- * Maps DexScreener chain IDs to GeckoTerminal network IDs
+ * Helper to fetch with retry and exponential backoff
  */
+async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
+    try {
+        await throttle();
+
+        // Add rotating proxy agent if enabled
+        const agent = proxyManager.getNextAgent();
+        if (agent) {
+            options.httpsAgent = agent;
+            options.proxy = false;
+        } else {
+            delete options.httpsAgent;
+        }
+
+        return await axios.get(url, options);
+    } catch (error) {
+        const status = error.response?.status;
+
+        // Handle 429 Rate Limit
+        if (status === 429 && retries > 0) {
+            console.warn(`[GeckoTerminal] ⚠️ Rate limited (429). Waiting ${backoff / 1000}s before retry... (${retries} retries left)`);
+            await new Promise(resolve => setTimeout(resolve, backoff));
+            return fetchWithRetry(url, options, retries - 1, backoff * 2);
+        }
+
+        // FALLBACK: If proxy fails (network error), retry WITHOUT proxy
+        if (!status && options.httpsAgent) {
+            console.warn(`[GeckoTerminal] 🌐 Proxy failed (${error.message}), retrying WITHOUT proxy...`);
+            const optionsNoProxy = { ...options };
+            delete optionsNoProxy.httpsAgent;
+            return fetchWithRetry(url, optionsNoProxy, retries, backoff);
+        }
+
+        throw error;
+    }
+}
 function mapChainId(chainId) {
     const chainMap = {
         'solana': 'solana',
@@ -53,29 +88,19 @@ function mapChainId(chainId) {
  */
 async function getTokenData(chainId, tokenAddress) {
     try {
-        await throttle();
         const network = mapChainId(chainId);
         const url = `${BASE_URL}/networks/${network}/tokens/${tokenAddress}/pools?page=1`;
-        
-        const options = {
+
+        const response = await fetchWithRetry(url, {
             timeout: 10000,
             headers: {
                 'Accept': 'application/json'
             }
-        };
-
-        // Add rotating proxy agent if enabled
-        const agent = proxyManager.getNextAgent();
-        if (agent) {
-            options.httpsAgent = agent;
-            options.proxy = false;
-        }
-
-        const response = await axios.get(url, options);
+        });
 
         if (response.data && response.data.data && response.data.data.length > 0) {
             const pools = response.data.data;
-            
+
             // Get the pool with highest liquidity
             const bestPool = pools.reduce((best, current) => {
                 const currentLiquidity = parseFloat(current.attributes?.reserve_in_usd) || 0;
@@ -119,38 +144,28 @@ async function getTokenData(chainId, tokenAddress) {
 async function getMultipleTokensData(chainId, tokenAddresses) {
     const results = new Map();
     const network = mapChainId(chainId);
-    
+
     // GeckoTerminal allows up to 30 addresses per request on the multi tokens endpoint
     const batchSize = 30;
-    
+
     for (let i = 0; i < tokenAddresses.length; i += batchSize) {
         const batch = tokenAddresses.slice(i, i + batchSize);
         const addressList = batch.join(',');
-        
+
         try {
-            await throttle();
             const url = `${BASE_URL}/networks/${network}/tokens/multi/${addressList}`;
-            const options = {
+            const response = await fetchWithRetry(url, {
                 timeout: 10000,
                 headers: {
                     'Accept': 'application/json'
                 }
-            };
-
-            // Add rotating proxy agent if enabled
-            const agent = proxyManager.getNextAgent();
-            if (agent) {
-                options.httpsAgent = agent;
-                options.proxy = false;
-            }
-
-            const response = await axios.get(url, options);
+            });
 
             if (response.data && response.data.data) {
                 for (const token of response.data.data) {
                     const addr = token.attributes?.address?.toLowerCase();
                     const attrs = token.attributes;
-                    
+
                     if (addr && attrs) {
                         results.set(addr, {
                             name: attrs.name || 'Unknown',
