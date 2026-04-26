@@ -28,7 +28,12 @@ function startMonitor(telegramBot) {
  */
 function getDynamicInterval() {
     const now = new Date();
-    const currentHour = now.getHours();
+    
+    // Calculate current hour in the target timezone
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const timezoneOffset = parseFloat(process.env.TIMEZONE_OFFSET) || 5.5; // Default to IST
+    const targetTime = new Date(utcTime + (3600000 * timezoneOffset));
+    const currentHour = targetTime.getHours();
     
     const startHour = parseInt(process.env.ACTIVE_START_HOUR) || 9;
     const endHour = parseInt(process.env.ACTIVE_END_HOUR) || 23;
