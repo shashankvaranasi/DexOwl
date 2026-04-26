@@ -6,6 +6,7 @@ const { connectDB, disconnectDB } = require('./database');
 const { initBot } = require('./bot');
 const priceMonitor = require('./priceMonitor');
 const apiRouter = require('./api');
+const proxyManager = require('./proxyManager');
 
 // Validate environment variables
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
@@ -69,6 +70,9 @@ async function main() {
     try {
         // Connect to MongoDB first
         await connectDB();
+
+        // Initialize Proxy Manager (fetches remote lists if PROXY_LINK is set)
+        await proxyManager.initialize();
 
         // Start Express server
         app.listen(PORT, () => {

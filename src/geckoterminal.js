@@ -1,10 +1,12 @@
 const axios = require('axios');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const proxyManager = require('./proxyManager');
 
 const BASE_URL = 'https://api.geckoterminal.com/api/v2';
 const RATE_LIMIT_DELAY_MS = 2000; // gecko terminal free limit is 30 calls / min. 1 call per 2 seconds is safe.
 let lastCallTime = 0;
 let throttleQueue = Promise.resolve();
+
+// Removed individual proxy logging as it's now handled by ProxyManager
 
 /**
  * Throttle requests to respect the rate limit of 30 calls/min (1 every 2s)
@@ -62,9 +64,10 @@ async function getTokenData(chainId, tokenAddress) {
             }
         };
 
-        // Add proxy agent if configured
-        if (process.env.PROXY_URL) {
-            options.httpsAgent = new HttpsProxyAgent(process.env.PROXY_URL);
+        // Add rotating proxy agent if enabled
+        const agent = proxyManager.getNextAgent();
+        if (agent) {
+            options.httpsAgent = agent;
             options.proxy = false;
         }
 
@@ -134,9 +137,10 @@ async function getMultipleTokensData(chainId, tokenAddresses) {
                 }
             };
 
-            // Add proxy agent if configured
-            if (process.env.PROXY_URL) {
-                options.httpsAgent = new HttpsProxyAgent(process.env.PROXY_URL);
+            // Add rotating proxy agent if enabled
+            const agent = proxyManager.getNextAgent();
+            if (agent) {
+                options.httpsAgent = agent;
                 options.proxy = false;
             }
 

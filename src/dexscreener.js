@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { HttpsProxyAgent } = require('https-proxy-agent');
+const proxyManager = require('./proxyManager');
 
 const BASE_URL = 'https://api.dexscreener.com';
 
@@ -7,6 +7,8 @@ const BASE_URL = 'https://api.dexscreener.com';
 const RATE_LIMIT_DELAY_MS = 1000; // 1 request per second to be safe
 let lastCallTime = 0;
 let throttleQueue = Promise.resolve();
+
+// Removed individual proxy logging as it's now handled by ProxyManager
 
 /**
  * Throttle requests to respect DexScreener rate limits
@@ -34,11 +36,11 @@ async function fetchWithRetry(url, options = {}, retries = 3, backoff = 2000) {
     try {
         await throttle();
         
-        // Add proxy agent if configured
-        if (process.env.PROXY_URL) {
-            const agent = new HttpsProxyAgent(process.env.PROXY_URL);
+        // Add rotating proxy agent if enabled
+        const agent = proxyManager.getNextAgent();
+        if (agent) {
             options.httpsAgent = agent;
-            options.proxy = false; // Disable default axios proxy logic
+            options.proxy = false;
         }
 
         return await axios.get(url, options);
