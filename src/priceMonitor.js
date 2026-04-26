@@ -1,6 +1,7 @@
 const dexscreener = require('./dexscreener');
 const geckoterminal = require('./geckoterminal');
 const watchlist = require('./watchlist');
+const analytics = require('./analytics');
 
 let monitorInterval = null;
 let bot = null;
@@ -207,6 +208,9 @@ ${changeEmoji} *${changeText}:* ${percentChange > 0 ? '+' : ''}${percentChange.t
             parse_mode: 'Markdown',
             disable_web_page_preview: true
         });
+
+        // Log to user analytics
+        await analytics.incrementUserMetric(entry.chatId, 'alertsReceived');
     } catch (error) {
         console.error(`Error sending alert to chat ${entry.chatId}:`, error.message);
     }

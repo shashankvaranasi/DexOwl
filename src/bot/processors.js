@@ -6,6 +6,7 @@
 const dexscreener = require('../dexscreener');
 const watchlistManager = require('../watchlist');
 const { escapeMarkdown, formatAge } = require('./utils');
+const analytics = require('../analytics');
 
 let bot = null;
 
@@ -62,6 +63,11 @@ You'll be notified when price drops by ${threshold}% or more.
 `.trim();
 
     await bot.sendMessage(chatId, successMessage, { parse_mode: 'Markdown' });
+
+    // Update analytics
+    await analytics.incrementUserMetric(chatId, 'requestsMade');
+    const userWatchlist = await watchlistManager.getWatchlistForChat(String(chatId));
+    await analytics.updateUserTokenCount(chatId, userWatchlist.length);
 }
 
 /**
@@ -72,6 +78,10 @@ async function processRemove(chatId, chainId, tokenAddress) {
 
     if (removed) {
         await bot.sendMessage(chatId, '✅ Token removed from your watchlist.');
+        
+        // Update analytics
+        const userWatchlist = await watchlistManager.getWatchlistForChat(String(chatId));
+        await analytics.updateUserTokenCount(chatId, userWatchlist.length);
     } else {
         await bot.sendMessage(chatId, '❌ Token not found in your watchlist.');
     }
@@ -112,6 +122,9 @@ async function processPrice(chatId, chainId, tokenAddress) {
         parse_mode: 'Markdown',
         disable_web_page_preview: true
     });
+
+    // Log request for analytics
+    await analytics.incrementUserMetric(chatId, 'requestsMade');
 }
 
 /**
@@ -143,6 +156,9 @@ async function processSearch(chatId, query) {
     message += `Use \`/add <chain> <address>\` to add a token.`;
 
     await bot.sendMessage(chatId, message.trim(), { parse_mode: 'Markdown' });
+
+    // Log request for analytics
+    await analytics.incrementUserMetric(chatId, 'requestsMade');
 }
 
 /**
