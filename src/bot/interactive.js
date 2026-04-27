@@ -4,7 +4,7 @@
  */
 
 const { SUPPORTED_CHAINS } = require('./constants');
-const { processAdd, processRemove, processPrice, processSearch, processThreshold } = require('./processors');
+const { processAdd, processRemove, processPrice, processSearch, processThreshold, processSecurityCheck } = require('./processors');
 
 let bot = null;
 
@@ -114,6 +114,19 @@ async function handleThresholdInteractive(msg) {
 }
 
 /**
+ * Handles /securitycheck command without arguments (interactive mode)
+ */
+async function handleSecurityCheckInteractive(msg) {
+    const chatId = msg.chat.id;
+    conversationState.set(chatId, { command: 'securitycheck', step: 'chain', data: {} });
+
+    await bot.sendMessage(chatId, '🛡️ *Security Audit*\n\nSelect the chain:', {
+        parse_mode: 'Markdown',
+        reply_markup: createChainKeyboard('securitycheck')
+    });
+}
+
+/**
  * Handles /cancel command
  */
 async function handleCancel(msg) {
@@ -175,6 +188,12 @@ async function handleCallbackQuery(callbackQuery) {
             state.step = 'address';
             await bot.editMessageText(
                 `⚡ *Update Threshold*\n\n✅ Chain: *${value}*\n\nNow please enter the token contract address:`,
+                { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }
+            );
+        } else if (command === 'securitycheck') {
+            state.step = 'address';
+            await bot.editMessageText(
+                `🛡️ *Security Audit*\n\n✅ Chain: *${value}*\n\nNow please enter the token contract address:`,
                 { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown' }
             );
         }
@@ -255,6 +274,11 @@ async function handleConversationMessage(msg) {
             conversationState.delete(chatId);
             await processThreshold(chatId, state.data.chain, state.data.address, percent);
         }
+    } else if (state.command === 'securitycheck') {
+        if (state.step === 'address') {
+            conversationState.delete(chatId);
+            await processSecurityCheck(chatId, state.data.chain, text);
+        }
     }
 }
 
@@ -266,6 +290,7 @@ module.exports = {
     handlePriceInteractive,
     handleSearchInteractive,
     handleThresholdInteractive,
+    handleSecurityCheckInteractive,
     handleCancel,
     handleCallbackQuery,
     handleConversationMessage

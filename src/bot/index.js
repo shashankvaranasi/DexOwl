@@ -59,6 +59,7 @@ function initBot(token) {
     bot.onText(/^\/price$/, interactive.handlePriceInteractive);
     bot.onText(/^\/search$/, interactive.handleSearchInteractive);
     bot.onText(/^\/threshold$/, interactive.handleThresholdInteractive);
+    bot.onText(/^\/securitycheck$/, interactive.handleSecurityCheckInteractive);
 
     // Handle callback queries (inline keyboard button presses)
     bot.on('callback_query', interactive.handleCallbackQuery);
