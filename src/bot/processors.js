@@ -7,6 +7,7 @@ const dexscreener = require('../dexscreener');
 const watchlistManager = require('../watchlist');
 const { escapeMarkdown, formatAge } = require('./utils');
 const analytics = require('../analytics');
+const security = require('../security');
 
 let bot = null;
 
@@ -174,11 +175,61 @@ async function processThreshold(chatId, chainId, tokenAddress, newThreshold) {
     }
 }
 
+/**
+ * Process security check command
+ */
+async function processSecurityCheck(chatId, chainId, tokenAddress) {
+    await bot.sendMessage(chatId, '🛡️ *Running Deep Security Audit...*\nThis involves API checks and raw bytecode analysis.', { parse_mode: 'Markdown' });
+
+    try {
+        const securityData = await security.performSecurityCheck(chainId, tokenAddress);
+
+        let message = `🛡️ *Security Report* for \`${tokenAddress.slice(0, 8)}...\`\n`;
+        message += `🔗 Chain: *${escapeMarkdown(chainId)}*\n\n`;
+
+        message += `📊 *Summary:* ${securityData.summary}\n`;
+        message += `🚩 *Risk Level:* ${securityData.riskLevel}\n\n`;
+
+        message += `📋 *Details:*\n`;
+        for (const detail of securityData.details) {
+            message += `• ${escapeMarkdown(detail)}\n`;
+        }
+
+        const verdict = securityData.verdict;
+        if (verdict === 'SAFE') {
+            message += `\n✅ *Verdict: SAFE / BURNED*
+This token has burned liquidity in a dead-end contract. It is mathematically impossible for the dev to pull it.`;
+        } else if (verdict === 'SCAM') {
+            message += `\n🚨 *Verdict: SCAM / RUG RISK*
+DANGER: The LP holder has absolute power to pull liquidity. The bytecode contains rug-friendly opcodes (DelegateCall/SelfDestruct). *DO NOT BUY.*`;
+        } else if (verdict === 'RISKY') {
+            message += `\n⚠️ *Verdict: RISKY / UNCERTAIN*
+The LP is in a contract, but that contract has movement logic. The dev *could* potentially withdraw it.`;
+        } else {
+            message += `\n🧐 *Verdict: MANUAL REVIEW*
+The automated audit is inconclusive. Please check the LP holders manually.`;
+        }
+
+        await bot.sendMessage(chatId, message.trim(), { 
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true 
+        });
+
+    } catch (error) {
+        console.error('[Processors] Security Check Error:', error);
+        await bot.sendMessage(chatId, '❌ Error performing security check. Please try again later.');
+    }
+
+    // Log request for analytics
+    await analytics.incrementUserMetric(chatId, 'requestsMade');
+}
+
 module.exports = {
     setBot,
     processAdd,
     processRemove,
     processPrice,
     processSearch,
-    processThreshold
+    processThreshold,
+    processSecurityCheck
 };

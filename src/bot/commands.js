@@ -8,6 +8,8 @@ const watchlistManager = require('../watchlist');
 const { CHAIN_ALIASES } = require('./constants');
 const { escapeMarkdown, formatAge } = require('./utils');
 
+const processors = require('./processors');
+
 let bot = null;
 
 /**
@@ -32,6 +34,7 @@ I'll notify you when your tracked memecoins drop in price.
 /remove <chain> <address> - Remove token from watchlist
 /list - Show your watchlist
 /price <chain> <address> - Get current price
+/securitycheck <chain> <address> - Deep security & bytecode audit 🛡️
 /search <query> - Search for tokens
 /threshold <chain> <address> <percent> - Update alert threshold
 /help - Show detailed help
@@ -43,6 +46,8 @@ solana (sol), ethereum (eth), bsc (bnb), arbitrum (arb), polygon, base, avalanch
 \`/add sol EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v 10\`
 
 This adds USDC on Solana with 10% drop alerts.
+\`/securitycheck eth 0x... \`
+Runs a deep audit on an Ethereum token.
 `.trim();
 
     await bot.sendMessage(chatId, welcomeMessage, { parse_mode: 'Markdown' });
@@ -75,6 +80,13 @@ When you add a token, I record the current price. If the price drops by your thr
 *Updating Threshold:*
 \`/threshold sol <address> 3\`
 Changes alert threshold to 3%
+
+*Security Audit:*
+\`/securitycheck <chain> <address>\`
+Runs a deep audit including:
+• LP Burn/Lock status
+• Top holder analysis
+• Smart contract bytecode audit (detects hidden transfer/withdraw logic)
 
 *Finding Token Address:*
 Use \`/search <token name>\` to find addresses
@@ -369,6 +381,31 @@ async function handleThresholdDirect(msg, match) {
     }
 }
 
+/**
+ * Handles /securitycheck command with arguments
+ */
+async function handleSecurityCheckDirect(msg, match) {
+    const chatId = msg.chat.id;
+    const args = match[1].trim().split(/\s+/);
+
+    if (args.length < 2) {
+        await bot.sendMessage(chatId, '❌ Usage: `/securitycheck <chain> <address>`', { parse_mode: 'Markdown' });
+        return;
+    }
+
+    const chainInput = args[0].toLowerCase();
+    const chainId = CHAIN_ALIASES[chainInput];
+
+    if (!chainId) {
+        await bot.sendMessage(chatId, `❌ Unknown chain: ${chainInput}`);
+        return;
+    }
+
+    const tokenAddress = args[1];
+
+    await processors.processSecurityCheck(chatId, chainId, tokenAddress);
+}
+
 module.exports = {
     setBot,
     handleStart,
@@ -378,5 +415,6 @@ module.exports = {
     handleList,
     handlePriceDirect,
     handleSearchDirect,
-    handleThresholdDirect
+    handleThresholdDirect,
+    handleSecurityCheckDirect
 };
