@@ -31,6 +31,7 @@ function initBot(token) {
         { command: 'remove', description: '➖ Remove token from watchlist' },
         { command: 'list', description: '📋 Show your watchlist' },
         { command: 'price', description: '💰 Get current token price' },
+        { command: 'securitycheck', description: '🛡️ Deep security & bytecode audit' },
         { command: 'search', description: '🔍 Search for tokens' },
         { command: 'threshold', description: '⚡ Update alert threshold' },
         { command: 'cancel', description: '❌ Cancel current operation' }
@@ -47,6 +48,7 @@ function initBot(token) {
     bot.onText(/\/remove (.+)/, commands.handleRemoveDirect);
     bot.onText(/\/list/, commands.handleList);
     bot.onText(/\/price (.+)/, commands.handlePriceDirect);
+    bot.onText(/\/securitycheck (.+)/, commands.handleSecurityCheckDirect);
     bot.onText(/\/search (.+)/, commands.handleSearchDirect);
     bot.onText(/\/threshold (.+)/, commands.handleThresholdDirect);
     bot.onText(/\/cancel/, interactive.handleCancel);
